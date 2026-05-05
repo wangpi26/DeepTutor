@@ -199,6 +199,16 @@
       .markdown h3 { font-size: 16px; }
       .markdown ul, .markdown ol { margin: 0 0 10px 22px; padding: 0; }
       .markdown li { margin: 3px 0; }
+      .markdown .math-inline {
+        font-family: "Times New Roman", Times, serif;
+        font-style: italic;
+        white-space: nowrap;
+      }
+      .markdown .math-inline sup,
+      .markdown .math-inline sub {
+        font-size: .72em;
+        line-height: 0;
+      }
       .markdown table {
         width: 100%;
         border-collapse: collapse;
@@ -364,13 +374,70 @@
       function escapeHtml(value) {
         return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
       }
+      function renderInlineMath(expr) {
+        const symbols = {
+          "\\rightarrow": "&#8594;",
+          "\\to": "&#8594;",
+          "\\leftarrow": "&#8592;",
+          "\\Rightarrow": "&#8658;",
+          "\\Leftarrow": "&#8656;",
+          "\\leftrightarrow": "&#8596;",
+          "\\Leftrightarrow": "&#8660;",
+          "\\leq": "&#8804;",
+          "\\le": "&#8804;",
+          "\\geq": "&#8805;",
+          "\\ge": "&#8805;",
+          "\\neq": "&#8800;",
+          "\\ne": "&#8800;",
+          "\\approx": "&#8776;",
+          "\\times": "&#215;",
+          "\\cdot": "&#183;",
+          "\\pm": "&#177;",
+          "\\infty": "&#8734;",
+          "\\sum": "&#8721;",
+          "\\prod": "&#8719;",
+          "\\alpha": "&#945;",
+          "\\beta": "&#946;",
+          "\\gamma": "&#947;",
+          "\\delta": "&#948;",
+          "\\epsilon": "&#949;",
+          "\\theta": "&#952;",
+          "\\lambda": "&#955;",
+          "\\mu": "&#956;",
+          "\\pi": "&#960;",
+          "\\sigma": "&#963;",
+          "\\phi": "&#966;",
+          "\\omega": "&#969;",
+        };
+        let html = escapeHtml(expr).trim();
+        html = html.replace(/\\text\{([^{}]+)\}/g, "$1");
+        html = html.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, "($1)/($2)");
+        for (const [latex, entity] of Object.entries(symbols)) {
+          html = html.replaceAll(escapeHtml(latex), entity);
+        }
+        html = html.replace(/\^\{([^{}]+)\}/g, "<sup>$1</sup>");
+        html = html.replace(/_\{([^{}]+)\}/g, "<sub>$1</sub>");
+        html = html.replace(/\^([A-Za-z0-9+\-=])/g, "<sup>$1</sup>");
+        html = html.replace(/_([A-Za-z0-9+\-=])/g, "<sub>$1</sub>");
+        html = html.replace(/\\([A-Za-z]+)/g, "$1");
+        return `<span class="math-inline">${html}</span>`;
+      }
       function renderInlineMarkdown(text) {
-        let html = escapeHtml(text);
-        html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+        const placeholders = [];
+        function stash(html) {
+          const token = `@@MDPLACEHOLDER${placeholders.length}@@`;
+          placeholders.push(html);
+          return token;
+        }
+        let source = String(text ?? "");
+        source = source.replace(/`([^`]+)`/g, (_, code) => stash(`<code>${escapeHtml(code)}</code>`));
+        source = source.replace(/\$([^$\n]+)\$/g, (_, expr) => stash(renderInlineMath(expr)));
+        let html = escapeHtml(source);
         html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
         html = html.replace(/__([^_]+)__/g, "<strong>$1</strong>");
         html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>");
         html = html.replace(/(?<!_)_([^_\n]+)_(?!_)/g, "<em>$1</em>");
+        html = html.replace(/@@MDPLACEHOLDER(\d+)@@/g, (_, idx) => placeholders[Number(idx)] || "");
         return html;
       }
       function isTableRow(line) {
