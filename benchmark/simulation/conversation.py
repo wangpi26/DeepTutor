@@ -546,6 +546,12 @@ def _format_question_block(q: dict) -> str:
     elif isinstance(options, list):
         for item in options:
             lines.append(str(item))
+    correct_answer = str(q.get("correct_answer", "") or "").strip()
+    explanation = str(q.get("explanation", "") or "").strip()
+    if correct_answer:
+        lines.append(f"Correct answer: {correct_answer}")
+    if explanation:
+        lines.append(f"Explanation: {explanation}")
     return "\n".join(lines)
 
 
@@ -575,6 +581,7 @@ async def deep_tutor_generate_practice_problem(
         enable_memory=enable_memory,
         enable_rag=enable_rag,
         enable_web=False,
+        include_answers=True,
     )
     questions = result.get("questions", []) or []
     if not questions:
@@ -640,6 +647,7 @@ async def deep_tutor_generate_practice_questions(
             enable_memory=enable_memory,
             enable_rag=enable_rag,
             enable_web=False,
+            include_answers=True,
         )
         questions = result.get("questions", []) or []
         for q in questions:

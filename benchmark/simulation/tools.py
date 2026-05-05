@@ -153,17 +153,21 @@ async def generate_questions(
     enable_memory: bool = True,
     enable_rag: bool = True,
     enable_web: bool = True,
+    include_answers: bool = False,
 ) -> dict[str, Any]:
     """Generate multiple-choice questions with memory.
 
     All outputs are saved under ``<workspace>/question/``.
-    Returns questions **without** correct answers so the student
-    agent cannot peek.
+    Returns questions **without** correct answers by default so the student
+    agent cannot peek. Set ``include_answers=True`` only for offline
+    evaluation/export flows where answer quality must be visible.
 
     Returns
     -------
     dict with keys: batch_id, batch_dir, num_generated,
-    questions (list of {question_id, question, options, question_type}).
+    questions (list of {question_id, question, options, question_type});
+    when include_answers=True, each item also includes correct_answer and
+    explanation if available.
     """
     session = WorkspaceSession(workspace)
     forest: TraceForest | None = None
@@ -214,18 +218,22 @@ async def generate_questions(
                 )
                 await forest.register(tree)
 
-        # Build question list for the student (no correct answers)
+        # Build question list for the student/evaluator.
         questions: list[dict[str, Any]] = []
         for r in summary.get("results", []):
             if not r.get("success"):
                 continue
             qa = r.get("qa_pair", {})
-            questions.append({
+            item = {
                 "question_id": qa.get("question_id", ""),
                 "question": qa.get("question", ""),
                 "options": qa.get("options", {}),
                 "question_type": qa.get("question_type", "choice"),
-            })
+            }
+            if include_answers:
+                item["correct_answer"] = qa.get("correct_answer", "")
+                item["explanation"] = qa.get("explanation", "")
+            questions.append(item)
 
         return {
             "batch_id": batch_id,
