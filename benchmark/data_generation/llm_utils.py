@@ -13,8 +13,6 @@ import logging
 import re
 from pathlib import Path
 
-import yaml
-
 logger = logging.getLogger("benchmark.llm_utils")
 
 # Project root: benchmark/data_generation/llm_utils.py → project root
@@ -143,6 +141,14 @@ def load_prompt(prompt_name: str) -> dict:
     prompt_path = PROJECT_ROOT / "benchmark" / "prompts" / f"{prompt_name}.yaml"
     if not prompt_path.exists():
         raise FileNotFoundError(f"Prompt template not found: {prompt_path}")
+
+    try:
+        import yaml
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "PyYAML is required for loading benchmark prompt templates. "
+            "Install it in the active Python environment with: python3 -m pip install PyYAML"
+        ) from exc
 
     with open(prompt_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
