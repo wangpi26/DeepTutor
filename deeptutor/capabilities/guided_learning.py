@@ -615,6 +615,9 @@ class GuidedLearningCapability(BaseCapability):
                 progress, "feynman_check", stream,
             )
             if response is None:
+                # Persist user explanation so it is not lost on reconnection
+                if kp_id and user_explanation:
+                    progress.feynman_explanations[kp_id] = user_explanation
                 result = {"passed": False, "feedback": "未评估（评估服务暂时不可用）", "gap": ""}
             else:
                 result = self._safe_json_parse(response, default={"passed": False, "feedback": "", "gap": ""})
@@ -624,6 +627,7 @@ class GuidedLearningCapability(BaseCapability):
             is_passed = passed is True or str(passed).lower() in ("true", "1", "yes")
             if is_passed:
                 progress.feynman_retries[kp_id] = 0
+                progress.feynman_explanations.pop(kp_id, None)
                 if kp_id:
                     progress.mastery_levels[kp_id] = max(progress.mastery_levels.get(kp_id, 0.0), 0.6)
                 self._advance_after_kp(progress, kps)

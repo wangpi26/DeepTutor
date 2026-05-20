@@ -314,3 +314,44 @@ async def test_cumulative_failure_below_threshold_retries():
     assert cap._call_llm.call_count >= 1
     # Failure count should have increased
     assert progress.stage_failure_counts["explain"] > 2
+
+
+# ── Feynman explanation persistence ───────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_feynman_failure_persists_explanation():
+    """When LLM fails, user explanation should be saved to feynman_explanations."""
+    cap = _make_capability()
+    cap._call_llm = AsyncMock(side_effect=RuntimeError("LLM unavailable"))
+    progress = _make_progress_with_module()
+    progress.current_stage = LearningStage.FEYNMAN_CHECK
+    stream = FakeStream()
+    stream.inputs = ["My explanation of the concept"]
+
+    await cap._run_feynman_check(progress, None, stream)
+
+    # User explanation should be persisted
+    assert progress.feynman_explanations.get("kp1") == "My explanation of the concept"
+    # Should show "未评估"
+    content_texts = [t for _, t in stream.events if _ == "content"]
+    assert any("未评估" in t for t in content_texts)
+
+
+@pytest.mark.asyncio
+async def test_feynman_success_clears_explanation():
+    """When LLM evaluation succeeds, feynman_explanations entry should be cleared."""
+    cap = _make_capability()
+    import json as _json
+    success_result = _json.dumps({"passed": True, "feedback": "很好", "gap": ""})
+    cap._call_llm = AsyncMock(return_value=success_result)
+    progress = _make_progress_with_module()
+    progress.current_stage = LearningStage.FEYNMAN_CHECK
+    progress.feynman_explanations["kp1"] = "previous unevaluated explanation"
+    stream = FakeStream()
+    stream.inputs = ["My explanation"]
+
+    await cap._run_feynman_check(progress, None, stream)
+
+    # Should have cleared the previous unevaluated explanation
+    assert "kp1" not in progress.feynman_explanations
