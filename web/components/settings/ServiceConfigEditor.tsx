@@ -8,6 +8,7 @@ import {
   EyeOff,
   Info,
   Loader2,
+  Pencil,
   Plus,
   Terminal,
   Trash2,
@@ -25,6 +26,7 @@ import {
   useSettings,
 } from "./SettingsContext";
 import { DimensionField } from "./DimensionField";
+import { nextProfileName } from "./profile-naming";
 import { searchProviderFields } from "./search-providers";
 import {
   activeProfileDetail,
@@ -270,12 +272,24 @@ export function ServiceConfigEditor({ service }: { service: ServiceName }) {
                           size={13}
                         />
                         <div
-                          className={`min-w-0 truncate text-[13px] leading-tight ${
+                          className={`min-w-0 flex-1 truncate text-[13px] leading-tight ${
                             isActive ? "font-semibold" : "font-medium"
                           }`}
                         >
                           {profile.name}
                         </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startProfileRename(profile);
+                          }}
+                          className="-mr-1 shrink-0 rounded-md p-1 text-[var(--muted-foreground)]/60 transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                          aria-label={t("Rename profile")}
+                          title={t("Rename profile")}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
                       </div>
                     )}
                     <div className="mt-0.5 truncate text-[11px] leading-tight text-[var(--muted-foreground)]/70">
@@ -961,10 +975,20 @@ function ProfileFields({
             onChange={(e) => {
               const val = e.target.value;
               const field = service === "search" ? "provider" : "binding";
+              const options = providers[service] || [];
+              const previousLabel =
+                options.find((p) => p.value === providerValue)?.label ?? "";
+              const match = options.find((p) => p.value === val);
               updateProfileField(service, field, val);
-              const match = (providers[service] || []).find(
-                (p) => p.value === val,
+              // Keep an un-customized profile name tracking its provider.
+              const renamed = nextProfileName(
+                profile.name,
+                previousLabel,
+                match?.label ?? "",
               );
+              if (renamed !== profile.name) {
+                updateProfileField(service, "name", renamed);
+              }
               if (match?.base_url) {
                 updateProfileField(service, "base_url", match.base_url);
               }
